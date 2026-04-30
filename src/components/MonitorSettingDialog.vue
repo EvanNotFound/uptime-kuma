@@ -9,6 +9,18 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" :aria-label="$t('Close')" />
                 </div>
                 <div class="modal-body">
+                    <div class="my-3">
+                        <label for="monitorDisplayName" class="form-label">{{ $t("Display Name") }}</label>
+                        <input
+                            id="monitorDisplayName"
+                            :value="monitor.name"
+                            type="text"
+                            class="form-control"
+                            data-testid="monitor-display-name-input"
+                            @input="(e) => changeName(monitor.group_index, monitor.monitor_index, e.target!.value)"
+                        />
+                    </div>
+
                     <div class="my-3 form-check">
                         <input
                             id="show-clickable-link"
@@ -146,6 +158,18 @@ export default {
             return (
                 monitor.element.sendUrl && monitor.element.url && monitor.element.url !== "https://" && !this.editMode
             );
+        },
+
+        /**
+         * Change the public display name
+         * @param {number} groupIndex Index of group monitor is member of
+         * @param {number} index Index of monitor within group
+         * @param {string} value The new display name
+         * @returns {void}
+         */
+        changeName(groupIndex, index, value) {
+            this.monitor.name = value;
+            this.$root.publicGroupList[groupIndex].monitorList[index].name = value;
         },
 
         /**

@@ -265,6 +265,7 @@ async function createTables() {
             .onUpdate("CASCADE");
         table.integer("weight").notNullable().defaultTo(1000);
         table.boolean("send_url").notNullable().defaultTo(false);
+        table.string("display_name", 150);
 
         table.index(["monitor_id", "group_id"], "fk");
     });

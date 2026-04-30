@@ -76,6 +76,7 @@
     "Invert Keyword": "Invert Keyword",
     "Expected Value": "Expected Value",
     "Json Query Expression": "Json Query Expression",
+    "Display Name": "Display Name",
     "Friendly Name": "Friendly Name",
     "defaultFriendlyName": "New Monitor",
     "URL": "URL",

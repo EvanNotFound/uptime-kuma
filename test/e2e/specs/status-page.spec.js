@@ -11,6 +11,7 @@ test.describe("Status Page", () => {
 
         // Monitor
         const monitorName = "Monitor for Status Page";
+        const monitorDisplayName = "Public Service Name";
         const tagName = "Client";
         const tagValue = "Acme Inc";
         const tagName2 = "Project"; // Add second tag name
@@ -107,6 +108,7 @@ test.describe("Status Page", () => {
 
         // Set public url on
         await page.getByTestId("monitor-settings").click();
+        await page.getByTestId("monitor-display-name-input").fill(monitorDisplayName);
         await page.getByTestId("show-clickable-link").check();
         await page.getByTestId("custom-url-input").fill(monitorCustomUrl);
         await page.getByTestId("monitor-settings-close").click();
@@ -123,6 +125,8 @@ test.describe("Status Page", () => {
         await expect(page.getByTestId("group-name")).toContainText(groupName);
         await expect(page.getByTestId("powered-by")).toHaveCount(0);
 
+        await expect(page.getByTestId("monitor-name")).toContainText(monitorDisplayName);
+        await expect(page.getByTestId("monitor-name")).not.toContainText(monitorName);
         await expect(page.getByTestId("monitor-name")).toHaveAttribute("href", monitorCustomUrl);
 
         await expect(page.getByTestId("update-countdown-text")).toContainText("00:");

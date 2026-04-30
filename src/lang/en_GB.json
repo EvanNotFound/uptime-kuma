@@ -184,6 +184,7 @@
     "monitorTypeSpecial": "Special",
     "markdownSupported": "Markdown syntax is supported. If using HTML, avoid leading spaces to prevent formatting issues.",
     "Edit": "Edit",
+    "Display Name": "Display Name",
     "Friendly Name": "Friendly Name",
     "locally configured mail transfer agent": "locally configured mail transfer agent",
     "Either enter the hostname of the server you want to connect to or localhost if you intend to use a locally configured mail transfer agent": "Either enter the hostname of the server you want to connect to, or {localhost} if you intend to use a {local_mta}",

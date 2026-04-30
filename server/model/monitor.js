@@ -85,7 +85,7 @@ class Monitor extends BeanModel {
     async toPublicJSON(showTags = false, certExpiry = false) {
         let obj = {
             id: this.id,
-            name: this.name,
+            name: this.displayName ?? this.name,
             sendUrl: this.sendUrl,
             type: this.type,
         };

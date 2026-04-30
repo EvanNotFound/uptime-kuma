@@ -930,7 +930,7 @@ export default {
 
                 const firstGroup = this.$root.publicGroupList[0];
 
-                firstGroup.monitorList.push(monitor);
+                firstGroup.monitorList.push({ ...monitor });
                 this.selectedMonitor = null;
             }
         },

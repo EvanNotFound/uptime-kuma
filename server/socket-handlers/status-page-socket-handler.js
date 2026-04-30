@@ -381,6 +381,7 @@ module.exports.statusPageSocketHandler = (socket) => {
                     relationBean.weight = monitorOrder++;
                     relationBean.group_id = groupBean.id;
                     relationBean.monitor_id = monitor.id;
+                    relationBean.display_name = monitor.name;
 
                     if (monitor.sendUrl !== undefined) {
                         relationBean.send_url = monitor.sendUrl;
