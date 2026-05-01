@@ -2,8 +2,6 @@ name: NPM Update
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 0 * * *" # Run daily at midnight UTC
 
 permissions:
   contents: write

@@ -5,9 +5,7 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  push:
-    branches: [master, 1.23.X, 3.0.0]
-  pull_request:
+  workflow_dispatch:
 permissions: {}
 
 jobs:
