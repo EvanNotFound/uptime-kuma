@@ -18,6 +18,7 @@ const {
     UP,
     MAINTENANCE,
     DOWN,
+    PENDING,
     INCIDENT_PAGE_SIZE,
 } = require("../../src/util");
 
@@ -259,6 +260,61 @@ class StatusPage extends BeanModel {
     }
 
     /**
+     * Map an overall status page status to a Statuspage-style indicator.
+     * @param {number} status from overallStatus
+     * @returns {string} Statuspage-style indicator
+     */
+    static getSummaryStatusIndicator(status) {
+        if (status === STATUS_PAGE_PARTIAL_DOWN) {
+            return "minor";
+        }
+
+        if (status === STATUS_PAGE_ALL_DOWN) {
+            return "critical";
+        }
+
+        if (status === STATUS_PAGE_MAINTENANCE) {
+            return "maintenance";
+        }
+
+        return "none";
+    }
+
+    /**
+     * Map a monitor heartbeat status to a Statuspage-style component status.
+     * @param {number|undefined} status Uptime Kuma monitor status
+     * @returns {string} Statuspage-style component status
+     */
+    static getSummaryComponentStatus(status) {
+        if (status === UP) {
+            return "operational";
+        }
+
+        if (status === PENDING) {
+            return "degraded_performance";
+        }
+
+        if (status === MAINTENANCE) {
+            return "under_maintenance";
+        }
+
+        return "major_outage";
+    }
+
+    /**
+     * Format dates for Statuspage-style responses.
+     * @param {string|null|undefined} value Date value
+     * @returns {string|null} ISO date string or null
+     */
+    static formatSummaryDate(value) {
+        if (!value) {
+            return null;
+        }
+
+        return dayjs.utc(value).toISOString();
+    }
+
+    /**
      * Get all data required for RSS
      * @param {StatusPage} statusPage Status page to get data for
      * @returns {object} Status page data
@@ -336,6 +392,80 @@ class StatusPage extends BeanModel {
             incidents,
             publicGroupList,
             maintenanceList,
+        };
+    }
+
+    /**
+     * Get a public Statuspage-style summary for a status page.
+     * @param {StatusPage} statusPage Status page to summarize
+     * @returns {object} Statuspage-style summary data
+     */
+    static async getStatusPageSummary(statusPage) {
+        const config = await statusPage.toPublicJSON();
+        const showTags = !!statusPage.show_tags;
+        const components = [];
+        const latestHeartbeats = [];
+        let updatedAt = null;
+        let position = 1;
+
+        let incidents = await R.find(
+            "incident",
+            " pin = 1 AND active = 1 AND status_page_id = ? ORDER BY created_date DESC",
+            [statusPage.id]
+        );
+        incidents = incidents.map((i) => i.toPublicJSON());
+
+        const maintenanceList = await StatusPage.getMaintenanceList(statusPage.id);
+        const groupList = await R.find("group", " public = 1 AND status_page_id = ? ORDER BY weight ", [statusPage.id]);
+
+        for (let groupBean of groupList) {
+            const monitorBeanList = await groupBean.getMonitorList();
+
+            for (let monitorBean of monitorBeanList) {
+                const publicMonitor = await monitorBean.toPublicJSON(showTags, config?.showCertificateExpiry);
+                const heartbeat = await R.findOne("heartbeat", " monitor_id = ? ORDER BY time DESC ", [publicMonitor.id]);
+                const publicHeartbeat = heartbeat ? heartbeat.toPublicJSON() : null;
+
+                if (publicHeartbeat) {
+                    latestHeartbeats.push(publicHeartbeat);
+
+                    if (!updatedAt || dayjs.utc(publicHeartbeat.time).isAfter(dayjs.utc(updatedAt))) {
+                        updatedAt = publicHeartbeat.time;
+                    }
+                }
+
+                components.push({
+                    id: String(publicMonitor.id),
+                    name: publicMonitor.name,
+                    status: StatusPage.getSummaryComponentStatus(publicHeartbeat?.status),
+                    created_at: StatusPage.formatSummaryDate(monitorBean.created_date),
+                    updated_at: StatusPage.formatSummaryDate(publicHeartbeat?.time),
+                    position: position++,
+                    description: null,
+                    group_id: String(groupBean.id),
+                    page_id: statusPage.slug,
+                    group: false,
+                    only_show_if_degraded: false,
+                });
+            }
+        }
+
+        const status = StatusPage.overallStatus(latestHeartbeats);
+
+        return {
+            page: {
+                id: statusPage.slug,
+                name: statusPage.title,
+                url: `/status/${statusPage.slug}`,
+                updated_at: StatusPage.formatSummaryDate(updatedAt),
+            },
+            components,
+            incidents,
+            scheduled_maintenances: maintenanceList,
+            status: {
+                indicator: StatusPage.getSummaryStatusIndicator(status),
+                description: StatusPage.getStatusDescription(status),
+            },
         };
     }
 

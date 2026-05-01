@@ -2,7 +2,7 @@ let express = require("express");
 const apicache = require("../modules/apicache");
 const { UptimeKumaServer } = require("../uptime-kuma-server");
 const StatusPage = require("../model/status_page");
-const { allowDevAllOrigin, sendHttpError } = require("../util-server");
+const { allowDevAllOrigin, allowAllOrigin, sendHttpError } = require("../util-server");
 const { R } = require("redbean-node");
 const { badgeConstants } = require("../../src/util");
 const { makeBadge } = require("badge-maker");
@@ -54,6 +54,26 @@ router.get("/api/status-page/:slug", cache("5 minutes"), async (request, respons
 
         // Response
         response.json(statusPageData);
+    } catch (error) {
+        sendHttpError(response, error.message);
+    }
+});
+
+// Statuspage-style status page summary
+router.get("/api/status-page/:slug/summary.json", cache("1 minutes"), async (request, response) => {
+    allowAllOrigin(response);
+    let slug = request.params.slug;
+    slug = slug.toLowerCase();
+
+    try {
+        let statusPage = await R.findOne("status_page", " slug = ? ", [slug]);
+
+        if (!statusPage || !statusPage.published) {
+            sendHttpError(response, "Status Page Not Found");
+            return;
+        }
+
+        response.json(await StatusPage.getStatusPageSummary(statusPage));
     } catch (error) {
         sendHttpError(response, error.message);
     }

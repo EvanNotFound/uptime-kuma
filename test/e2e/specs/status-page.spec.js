@@ -129,6 +129,31 @@ test.describe("Status Page", () => {
         await expect(page.getByTestId("monitor-name")).not.toContainText(monitorName);
         await expect(page.getByTestId("monitor-name")).toHaveAttribute("href", monitorCustomUrl);
 
+        const summaryResponse = await page.request.get("/api/status-page/example/summary.json");
+        expect(summaryResponse.status()).toBe(200);
+        expect(summaryResponse.headers()["access-control-allow-origin"]).toBe("*");
+
+        const summary = await summaryResponse.json();
+        expect(summary.page).toEqual(expect.objectContaining({
+            id: "example",
+            name: "Example",
+            url: "/status/example",
+        }));
+        expect(summary.components[0]).toEqual(expect.objectContaining({
+            name: monitorDisplayName,
+            page_id: "example",
+            group: false,
+            only_show_if_degraded: false,
+        }));
+        expect(JSON.stringify(summary)).not.toContain(monitorName);
+        expect(summary.status).toEqual(expect.objectContaining({
+            indicator: expect.any(String),
+            description: expect.any(String),
+        }));
+
+        const missingSummaryResponse = await page.request.get("/api/status-page/missing-summary/summary.json");
+        expect(missingSummaryResponse.status()).toBe(404);
+
         await expect(page.getByTestId("update-countdown-text")).toContainText("00:");
         const updateCountdown = Number(
             (await page.getByTestId("update-countdown-text").textContent()).match(/(\d+):(\d+)/)[2]

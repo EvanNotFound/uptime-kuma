@@ -1,6 +1,7 @@
 const { describe, test, mock } = require("node:test");
 const assert = require("node:assert");
 const StatusPage = require("../../server/model/status_page");
+const { R } = require("redbean-node");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const {
@@ -8,6 +9,10 @@ const {
     STATUS_PAGE_ALL_DOWN,
     STATUS_PAGE_PARTIAL_DOWN,
     STATUS_PAGE_MAINTENANCE,
+    UP,
+    DOWN,
+    PENDING,
+    MAINTENANCE,
 } = require("../../src/util");
 
 dayjs.extend(utc);
@@ -42,6 +47,116 @@ describe("StatusPage", () => {
         test("returns '?' for unknown status values", () => {
             const description = StatusPage.getStatusDescription(999);
             assert.strictEqual(description, "?");
+        });
+    });
+
+    describe("getSummaryStatusIndicator()", () => {
+        test("maps overall statuses to Statuspage-style indicators", () => {
+            assert.strictEqual(StatusPage.getSummaryStatusIndicator(STATUS_PAGE_ALL_UP), "none");
+            assert.strictEqual(StatusPage.getSummaryStatusIndicator(STATUS_PAGE_PARTIAL_DOWN), "minor");
+            assert.strictEqual(StatusPage.getSummaryStatusIndicator(STATUS_PAGE_ALL_DOWN), "critical");
+            assert.strictEqual(StatusPage.getSummaryStatusIndicator(STATUS_PAGE_MAINTENANCE), "maintenance");
+            assert.strictEqual(StatusPage.getSummaryStatusIndicator(-1), "none");
+        });
+    });
+
+    describe("getSummaryComponentStatus()", () => {
+        test("maps monitor statuses to Statuspage-style component statuses", () => {
+            assert.strictEqual(StatusPage.getSummaryComponentStatus(UP), "operational");
+            assert.strictEqual(StatusPage.getSummaryComponentStatus(DOWN), "major_outage");
+            assert.strictEqual(StatusPage.getSummaryComponentStatus(PENDING), "degraded_performance");
+            assert.strictEqual(StatusPage.getSummaryComponentStatus(MAINTENANCE), "under_maintenance");
+            assert.strictEqual(StatusPage.getSummaryComponentStatus(undefined), "major_outage");
+        });
+    });
+
+    describe("getStatusPageSummary()", () => {
+        test("returns public display names and omits private monitor names", async () => {
+            const statusPage = {
+                id: 10,
+                slug: "example",
+                title: "Example Status",
+                show_tags: false,
+                toPublicJSON: async () => ({
+                    showCertificateExpiry: false,
+                }),
+            };
+            const group = {
+                id: 20,
+                getMonitorList: async () => [
+                    {
+                        id: 30,
+                        name: "Private Origin",
+                        created_date: "2026-05-01 10:00:00",
+                        toPublicJSON: async () => ({
+                            id: 30,
+                            name: "Public Service",
+                        }),
+                    },
+                ],
+            };
+
+            mock.method(R, "find", async (model) => {
+                if (model === "incident") {
+                    return [
+                        {
+                            toPublicJSON: () => ({
+                                id: 1,
+                                title: "Incident",
+                            }),
+                        },
+                    ];
+                }
+
+                if (model === "group") {
+                    return [group];
+                }
+
+                return [];
+            });
+            mock.method(R, "findOne", async () => ({
+                status: UP,
+                time: "2026-05-01 10:05:00",
+                ping: 42,
+                toPublicJSON: () => ({
+                    status: UP,
+                    time: "2026-05-01 10:05:00",
+                    ping: 42,
+                }),
+            }));
+            mock.method(StatusPage, "getMaintenanceList", async () => [
+                {
+                    id: 2,
+                    title: "Maintenance",
+                },
+            ]);
+
+            try {
+                const summary = await StatusPage.getStatusPageSummary(statusPage);
+                const serialized = JSON.stringify(summary);
+
+                assert.deepStrictEqual(Object.keys(summary), [
+                    "page",
+                    "components",
+                    "incidents",
+                    "scheduled_maintenances",
+                    "status",
+                ]);
+                assert.strictEqual(summary.page.id, "example");
+                assert.strictEqual(summary.page.name, "Example Status");
+                assert.strictEqual(summary.page.url, "/status/example");
+                assert.strictEqual(summary.components[0].id, "30");
+                assert.strictEqual(summary.components[0].name, "Public Service");
+                assert.strictEqual(summary.components[0].status, "operational");
+                assert.strictEqual(summary.components[0].group_id, "20");
+                assert.strictEqual(summary.components[0].page_id, "example");
+                assert.strictEqual(summary.status.indicator, "none");
+                assert.strictEqual(summary.status.description, "All Systems Operational");
+                assert.ok(serialized.includes("Public Service"));
+                assert.strictEqual(serialized.includes("Private Origin"), false);
+            } finally {
+                mock.restoreAll();
+            }
         });
     });
 

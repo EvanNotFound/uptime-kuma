@@ -1,19 +1,4 @@
-## Purpose
-
-Public status pages can present visitor-facing monitor names that differ from private monitor names.
-
-## Requirements
-
-### Requirement: Status page monitor display name
-The system SHALL store a public display name for each monitor entry on a status page independently from the monitor's private name.
-
-#### Scenario: Existing status page monitor entries are migrated
-- **WHEN** an existing database is upgraded to include public display names
-- **THEN** each existing status page monitor entry has its public display name initialized from the current private monitor name
-
-#### Scenario: New status page monitor entry defaults to monitor name
-- **WHEN** an authenticated user adds a monitor to a status page
-- **THEN** the new status page monitor entry uses the current monitor name as its initial public display name
+## MODIFIED Requirements
 
 ### Requirement: Public status page uses display name
 The system SHALL use the status page monitor display name when rendering monitor labels for visitors.
@@ -42,11 +27,3 @@ The system SHALL NOT expose the private monitor name to unauthenticated visitors
 - **WHEN** an unauthenticated client requests the public status page summary for a monitor with private name `Private Origin` and public display name `Public Service`
 - **THEN** the summary component contains `Public Service` as the component name
 - **AND** the summary response does not contain `Private Origin`
-
-### Requirement: Editor can customize public display name
-The system SHALL allow authenticated status page editors to change the public display name of a monitor entry without changing the monitor's private name.
-
-#### Scenario: Authenticated editor changes display name
-- **WHEN** an authenticated editor changes a status page monitor display name and saves the status page
-- **THEN** subsequent public status page views use the new display name
-- **AND** the monitor's private name remains unchanged in monitor management
