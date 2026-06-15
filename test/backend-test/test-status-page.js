@@ -1,6 +1,7 @@
 const { describe, test, mock } = require("node:test");
 const assert = require("node:assert");
 const StatusPage = require("../../server/model/status_page");
+const { statusPageSocketHandler } = require("../../server/socket-handlers/status-page-socket-handler");
 const { R } = require("redbean-node");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
@@ -185,6 +186,99 @@ describe("StatusPage", () => {
                 const rss = await StatusPage.renderRSS(mockStatusPage, MOCK_FEED_URL);
 
                 assert.ok(rss.includes("<pubDate>Sat, 24 Jan 2026 13:16:25 GMT</pubDate>"));
+            } finally {
+                mock.restoreAll();
+            }
+        });
+    });
+
+    describe("saveStatusPage", () => {
+        test("rejects missing domainNameList before updating domain mappings", async () => {
+            const updateDomainNameList = mock.fn(async () => {});
+            const socket = {
+                userID: 1,
+                handlers: {},
+                on(event, handler) {
+                    this.handlers[event] = handler;
+                },
+            };
+
+            statusPageSocketHandler(socket);
+            const loadDomainMappingList = mock.method(StatusPage, "loadDomainMappingList", async () => {});
+
+            mock.method(R, "findOne", async () => ({
+                id: 1,
+                slug: "default",
+                updateDomainNameList,
+            }));
+
+            const store = mock.method(R, "store", async () => {});
+
+            try {
+                const res = await new Promise((resolve) => {
+                    socket.handlers.saveStatusPage(
+                        "default",
+                        {
+                            slug: "default",
+                            title: "Default",
+                            analyticsType: null,
+                        },
+                        "/icon.svg",
+                        [],
+                        resolve
+                    );
+                });
+
+                assert.strictEqual(res.ok, false);
+                assert.strictEqual(res.msg, "Status page domain list is not loaded.");
+                assert.strictEqual(updateDomainNameList.mock.calls.length, 0);
+                assert.strictEqual(loadDomainMappingList.mock.calls.length, 0);
+                assert.strictEqual(store.mock.calls.length, 0);
+            } finally {
+                mock.restoreAll();
+            }
+        });
+
+        test("passes loaded domainNameList through for mapping updates", async () => {
+            const updateDomainNameList = mock.fn(async () => {});
+            const socket = {
+                userID: 1,
+                handlers: {},
+                on(event, handler) {
+                    this.handlers[event] = handler;
+                },
+            };
+
+            statusPageSocketHandler(socket);
+
+            mock.method(R, "findOne", async () => ({
+                id: 1,
+                slug: "default",
+                updateDomainNameList,
+            }));
+            mock.method(R, "store", async () => {});
+            mock.method(R, "exec", async () => {});
+            mock.method(StatusPage, "loadDomainMappingList", async () => {});
+
+            try {
+                const res = await new Promise((resolve) => {
+                    socket.handlers.saveStatusPage(
+                        "default",
+                        {
+                            slug: "default",
+                            title: "Default",
+                            analyticsType: null,
+                            domainNameList: [],
+                        },
+                        "/icon.svg",
+                        [],
+                        resolve
+                    );
+                });
+
+                assert.strictEqual(res.ok, true);
+                assert.strictEqual(updateDomainNameList.mock.calls.length, 1);
+                assert.deepStrictEqual(updateDomainNameList.mock.calls[0].arguments[0], []);
             } finally {
                 mock.restoreAll();
             }

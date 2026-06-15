@@ -302,6 +302,10 @@ module.exports.statusPageSocketHandler = (socket) => {
 
             checkSlug(config.slug);
 
+            if (!Array.isArray(config.domainNameList)) {
+                throw new Error("Status page domain list is not loaded.");
+            }
+
             const header = "data:image/png;base64,";
 
             // Check logo format

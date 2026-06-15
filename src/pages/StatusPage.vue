@@ -120,6 +120,7 @@
                         {{ $t("Domain Names") }}
                         <button
                             class="p-0 bg-transparent border-0"
+                            :disabled="!adminConfigLoaded"
                             :aria-label="$t('Add a domain')"
                             @click="addDomainField"
                         >
@@ -223,7 +224,7 @@
 
             <!-- Sidebar Footer -->
             <div class="sidebar-footer">
-                <button class="btn btn-success me-2" :disabled="loading" data-testid="save-button" @click="save">
+                <button class="btn btn-success me-2" :disabled="saveDisabled" data-testid="save-button" @click="save">
                     <font-awesome-icon icon="save" />
                     {{ $t("Save") }}
                 </button>
@@ -700,6 +701,8 @@ export default {
             loadedData: false,
             baseURL: "",
             clickedEditButton: false,
+            adminConfigLoaded: false,
+            adminConfigLoading: false,
             maintenanceList: [],
             lastUpdateTime: dayjs(),
             updateCountdown: null,
@@ -763,6 +766,13 @@ export default {
 
         editMode() {
             return this.enableEditMode && this.$root.socket.connected;
+        },
+
+        saveDisabled() {
+            return (
+                this.loading ||
+                (this.enableEditMode && (!this.adminConfigLoaded || !Array.isArray(this.config.domainNameList)))
+            );
         },
 
         editIncidentMode() {
@@ -903,17 +913,7 @@ export default {
          */
         "$root.loggedIn"(loggedIn) {
             if (loggedIn) {
-                this.$root.getSocket().emit("getStatusPage", this.slug, (res) => {
-                    if (res.ok) {
-                        this.config = res.config;
-
-                        if (!this.config.customCSS) {
-                            this.config.customCSS = "body {\n" + "  \n" + "}\n";
-                        }
-                    } else {
-                        this.$root.toastError(res.msg);
-                    }
-                });
+                this.loadAdminConfig();
             }
         },
 
@@ -986,10 +986,8 @@ export default {
 
         this.getData()
             .then((res) => {
-                this.config = res.data.config;
-
-                if (!this.config.domainNameList) {
-                    this.config.domainNameList = [];
+                if (!this.adminConfigLoaded) {
+                    this.config = res.data.config;
                 }
 
                 if (this.config.icon) {
@@ -1056,6 +1054,44 @@ export default {
             } else {
                 return axios.get("/api/status-page/" + this.slug);
             }
+        },
+
+        /**
+         * Load private status page config for editing
+         * @returns {void}
+         */
+        loadAdminConfig() {
+            if (!this.slug || this.adminConfigLoading) {
+                return;
+            }
+
+            this.adminConfigLoading = true;
+            if (this.enableEditMode) {
+                this.loading = true;
+            }
+
+            this.$root.getSocket().emit("getStatusPage", this.slug, (res) => {
+                this.adminConfigLoading = false;
+                if (this.enableEditMode) {
+                    this.loading = false;
+                }
+
+                if (res.ok) {
+                    this.config = res.config;
+                    this.adminConfigLoaded = Array.isArray(this.config.domainNameList);
+
+                    if (!this.config.customCSS) {
+                        this.config.customCSS = "body {\n" + "  \n" + "}\n";
+                    }
+
+                    if (this.config.icon) {
+                        this.imgDataUrl = this.config.icon;
+                    }
+                } else {
+                    this.adminConfigLoaded = false;
+                    this.$root.toastError(res.msg);
+                }
+            });
         },
 
         /**
@@ -1133,11 +1169,16 @@ export default {
         edit() {
             if (this.hasToken) {
                 this.$root.initSocketIO(true);
+                this.adminConfigLoaded = false;
                 this.enableEditMode = true;
                 this.clickedEditButton = true;
 
                 // Try to fix #1658
                 this.loadedData = true;
+
+                if (this.$root.loggedIn) {
+                    this.loadAdminConfig();
+                }
             }
         },
 
@@ -1146,6 +1187,11 @@ export default {
          * @returns {void}
          */
         save() {
+            if (!this.adminConfigLoaded || !Array.isArray(this.config.domainNameList)) {
+                toast.error("Status page domain list is still loading. Please try again.");
+                return;
+            }
+
             this.loading = true;
             let startTime = new Date();
             this.config.slug = this.config.slug.trim().toLowerCase();
@@ -1230,6 +1276,10 @@ export default {
          * @returns {void}
          */
         addDomainField() {
+            if (!Array.isArray(this.config.domainNameList)) {
+                return;
+            }
+
             this.config.domainNameList.push("");
         },
 
